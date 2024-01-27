@@ -8,3 +8,6 @@ Included commands:
 - showmap togglevi   - Toggles the showing if VI maps.
 - showmap version    - Shows the current version info.
 - showmap list       - Lists all available area maps.
+
+Credit to Pwar for the original idea.
+Credit to The Midgaardian Publishing Group for hosting the updated maps and VI support.
