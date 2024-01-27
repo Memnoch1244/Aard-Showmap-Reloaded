@@ -10,4 +10,5 @@ Included commands:
 - showmap list       - Lists all available area maps.
 
 Credit to Pwar for the original idea.
+
 Credit to The Midgaardian Publishing Group for hosting the updated maps and VI support.
