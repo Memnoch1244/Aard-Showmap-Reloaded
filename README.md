@@ -1,4 +1,6 @@
 # Aard Mapper Reloaded
+Note: Plugin requires both the XML and DB files to be added to your plugins folder.
+
 Aardwolf plugin to show updated maps in a web browser.  Includes VI support.
 
 Included commands:
