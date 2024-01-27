@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+<!-- Saved on Thursday, January 25, 2024, 04:19 AM -->
+<!-- MuClient version 5.07 -->
+
+<muclient>
+<plugin
+   name="Aard_Showmap_Reloaded"
+   author="Memnoch"
+   id="f971d85d61ed0da5db694f84"
+   language="Lua"
+   purpose="Shows link to player created maps in a web browser."
+   date_written="2024-01-25 04:19:25"
+   requires="5.07"
+   version="2.0"
+   save_state="y"
+   >
+
+<description trim="y">
+<![CDATA[
+
+showmap            - display links to all maps for area you are currently in
+showmap [areaname] - display links to all maps for area you specify 
+showmap list       - lists of all areas with external map data (short name)
+showmap togglevi   - enables or disables visually impaired mode (opens automatically VI map if available for area)
+showmap version    - displays the version of the Showmap plugin (also visible in help)
+showmap help       - shows only this help
+	
+Special thanks to Myth for providing updated map data and The Midgaardian Publishing Group for hosting!
+Credit to Pwar for the original Showmap idea.
+
+]]>
+</description>
+
+</plugin>
+
+<!--  Aliases  -->
+
+<aliases>
+  <alias
+   match="^showmap (.+)$"
+   script="showmap_kw"
+   omit_from_output="n"
+   omit_from_log="n"
+   omit_from_command_history="n"
+   enabled="y"
+   sequence="100"
+   regexp="y"
+  >
+  </alias>
+    
+  <alias
+   match="^showmap$"
+   script="showmap_nokw"
+   omit_from_output="n"
+   omit_from_log="n"
+   omit_from_command_history="n"
+   enabled="y"
+   sequence="100"
+   regexp="y"
+  >
+  </alias>
+
+</aliases>
+
+<script>
+<![CDATA[
+require "gmcphelper"
+
+local mapTable = {}   -- holds all area data
+local showmap_ver = "2.0"
+local area_kw   -- current area
+local areaid   -- searched area
+local toggle_vi = false
+
+-- Ensure DB file exists
+function file_exists(name)
+  local f=io.open(name,"r")
+  if f~=nil then 
+    io.close(f) 
+    return true 
+  else 
+    return false 
+  end  -- if
+end  -- function
+
+-- Called by showmap with a wildcard
+function showmap_kw(name, line, wildcards)
+  areaid = nil
+
+  -- Check to see what the wildcard is first
+  if wildcards ~=nil then
+    wildcards[1] = string.lower(wildcards[1])  -- force lowercase for match
+    if wildcards[1] == "help" then
+      ColourNote("springgreen","black","Showmap Reloaded v" .. showmap_ver .. " for Aardwolf by Memnoch")
+      ColourNote("springgreen","black","=============================================")
+      Note(GetPluginInfo(GetPluginID(), 3))
+      Send("")
+      return
+    elseif wildcards[1] == "version" then
+      ColourNote("springgreen","black","Currently running version: Showmap Reloaded v" .. showmap_ver .. " by Memnoch")
+      Send("")
+      return
+    elseif wildcards[1] == "ft2" then
+      areaid = "ftii"
+    elseif wildcards[1] == "list" then
+      for i = 1, #mapTable do
+        Hyperlink(mapTable[i].map, mapTable[i].area, "Click link to be taken to your web browser.", "cyan", "black", 1)
+        Note("")
+      end  -- for
+      Send("")
+      return
+    elseif wildcards[1] == "togglevi" then
+      if toggle_vi == false then
+        toggle_vi = true
+        Note("Showmap VI mode toggled on.")
+      else
+        toggle_vi = false
+        Note("Showmap VI mode toggled off.")
+      end
+      Send("")
+      return
+    else
+      areaid = wildcards[1]
+    end  -- if type of wildcard entered
+  end  -- if wildcards
+
+  -- Convert areaid to lowercase for matching
+  if areaid ~= nil then
+    areaid = string.lower(areaid)
+  end
+
+  -- If found, returns the row ID
+  areafound = find_area(areaid)
+
+  -- Display the area details and map link if available
+  if areafound then
+    if toggle_vi == false then
+      ColourTell("springgreen","black", "Showmap Reloaded v" .. showmap_ver .. " for Aardwolf by Memnoch")
+      Note("")
+      Note("")
+      ColourTell("springgreen","black", mapTable[areafound].area .. " (")
+      ColourTell("yellow","black", mapTable[areafound].keyword)
+      ColourTell("springgreen","black", ") - [Lvl " .. mapTable[areafound].minlvl .. " - " .. mapTable[areafound].maxlvl .. "] - Builder(s): " .. mapTable[areafound].builder)
+      Note("")
+      ColourTell("springgreen","black", "Speedwalk: ")
+      ColourTell("yellow","black", mapTable[areafound].speedwalk)
+      Note("")
+      ColourTell("springgreen","black", "Goal: ")
+      ColourTell("yellow","black", mapTable[areafound].goal)
+      Note("")
+      Note("")
+
+      -- Check DB to see if a map is available
+      if mapTable[areafound].map == "No map available" then
+        ColourTell("red","black","No map currently available for this zone.")
+        Send("")
+      else
+        ColourTell("springgreen","black","Hosted by: ")
+        ColourTell("magenta","black","The Midgaardian Publishing Group")
+        Note("")
+        Hyperlink(mapTable[areafound].map, mapTable[areafound].map, "Click link to be taken to your web browser.", "cyan", "black", 1)
+        Send("")
+      end  -- if
+    else
+      Note(mapTable[areafound].area .. " with keyword " .. mapTable[areafound].keyword)
+      Note("Level range from " .. mapTable[areafound].minlvl .. " to " .. mapTable[areafound].maxlvl)
+      Note("")
+      Note("Map hosted by The Midgaardian Publishing Group")
+      Hyperlink(mapTable[areafound].vimap, mapTable[areafound].vimap, "Click link to be taken to your web browser.", "cyan", "black", 1)
+      Send("")
+    end  -- if check for VI
+  else
+    ColourTell("red","black", "No maps found for " .. areaid .. " in the database.")
+    Send("")
+  end  -- if
+
+end  -- function
+
+-- Called by showmap with no wildcards
+function showmap_nokw()
+  areaid = area_kw
+
+  -- areaid pulled from current zone
+  if areaid ~= nil then
+    areaid = string.lower(areaid)
+  end  -- if
+
+  -- If found, returns the row ID
+  areafound = find_area(areaid)
+
+  -- Display the area details and map link if available
+  if areafound then
+    
+    ColourTell("springgreen","black", "Showmap Reloaded v" .. showmap_ver .. " for Aardwolf by Memnoch")
+    Note("")
+    Note("")
+    ColourTell("springgreen","black", mapTable[areafound].area .. " (")
+    ColourTell("yellow","black", mapTable[areafound].keyword)
+    ColourTell("springgreen","black", ") - [Lvl " .. mapTable[areafound].minlvl .. " - " .. mapTable[areafound].maxlvl .. "] - Builder(s): " .. mapTable[areafound].builder)
+    Note("")
+    ColourTell("springgreen","black", "Speedwalk: ")
+    ColourTell("yellow","black", mapTable[areafound].speedwalk)
+    Note("")
+    ColourTell("springgreen","black", "Goal: ")
+    ColourTell("yellow","black", mapTable[areafound].goal)
+    Note("")
+    Note("")
+
+    -- Check DB to see if a map is available
+    if mapTable[areafound].map == "No map available" then
+      ColourTell("red","black","No map currently available for this zone.")
+      Send("")
+    else
+      ColourTell("springgreen","black","Hosted by: ")
+      ColourTell("magenta","black","The Midgaardian Publishing Group")
+      Note("")
+      Hyperlink(mapTable[areafound].map, mapTable[areafound].map, "Click link to be taken to your web browser.", "cyan", "black", 1)
+      Send("")
+    end  -- if
+
+  else
+    ColourTell("red","black", "No maps found for " .. areaid .. " in the database.")
+    Send("")
+  end  -- if
+
+end  --function
+
+-- Checks to see if the keyword is in the DB
+function find_area(wildcards)
+  for i = 1, #mapTable do
+    if (string.find(mapTable[i].keyword, wildcards)) ~= nil then
+      return i
+    end  -- if
+  end  -- for loop
+  return false
+end  -- function
+
+function OnPluginBroadcast(msg, id, name, text)
+  -- GMCP Handler plugin
+  if id == "3e7dedbe37e44942dd46d264" then
+    -- Capturing the current zone
+    if text == "room.info" then
+      area_kw = gmcp("room.info.zone")
+    end  -- area logging
+  end  -- id check
+end  -- function
+
+function OnPluginInstall()
+  -- Sets the file path to the default plugin folder for MUSH
+  local dbFilePath = GetInfo(60) .. "showmapdb.db"
+  local rowCount = 0
+
+  -- Request current zone data
+  Send_GMCP_Packet("request area")
+
+  -- Check to ensure the DB file is in the plugin folder
+  if not file_exists(dbFilePath) then
+    ColourNote("red", "", "ERROR: Unable to locate database file " .. dbFilePath)
+    ColourNote("red", "", "Reinstall the plugin and ensure showmapdb.db is in the plugins folder.")
+    return
+  end
+
+  -- If the DB file isn't loaded into the plugin then load it
+  if not db then
+    db = assert (sqlite3.open(dbFilePath))
+    local table_exists = false
+
+    -- SQL select statement to get all table data
+    for row in db:nrows("SELECT * FROM areas ORDER BY keyword ASC") do
+      
+      rowCount = rowCount + 1
+      if row["area"] ~= nil then
+        mapTable[rowCount] = row
+      end  -- if
+      if mapTable ~= nil then
+        table_exists = true
+      end  -- if
+    end  -- for
+
+    -- If the areas table isn't found in the DB it will throw an error
+    if not table_exists then
+      ColourNote("red", "", "ERROR: Found database file but unable to locate table in database. Your database file may be corrupt. Please reinstall the plugin and database file.")
+      return
+    else
+      Note("[LOADED] Showmap Reloaded v" .. showmap_ver .. " by Memnoch (showmap help)")
+      Note("Successfully loaded data for " .. #mapTable .. " areas from the database.")
+    end  -- if
+
+  end  -- if
+end  -- function
+
+]]>
+</script> 
+
+</muclient>
