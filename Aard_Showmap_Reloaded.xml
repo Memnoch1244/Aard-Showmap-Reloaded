@@ -12,7 +12,7 @@
    purpose="Shows link to player created maps in a web browser."
    date_written="2024-01-25 04:19:25"
    requires="5.07"
-   version="2.0"
+   version="2.1"
    save_state="y"
    >
 
@@ -26,8 +26,9 @@ showmap togglevi   - enables or disables visually impaired mode (opens automatic
 showmap version    - displays the version of the Showmap plugin (also visible in help)
 showmap help       - shows only this help
 	
-Special thanks to Myth for providing updated map data and The Midgaardian Publishing Group for hosting!
-Credit to Pwar for the original Showmap idea.
+Special thanks to Myth for providing updated map data. 
+Special thanks to The Midgaardian Publishing Group and Boot Camp for archiving and hosting.
+Credit to Pwar for the original Showmap.
 
 ]]>
 </description>
@@ -61,17 +62,34 @@ Credit to Pwar for the original Showmap idea.
   >
   </alias>
 
+  <alias
+   match="^showmap update$"
+   script="update_maps_list"
+   omit_from_output="n"
+   omit_from_log="n"
+   omit_from_command_history="n"
+   enabled="y"
+   sequence="99"
+   regexp="y"
+  >
+  </alias>
+
 </aliases>
 
 <script>
 <![CDATA[
 require "gmcphelper"
+require "async"
+require "json"
+require "tprint"
 
-local mapTable = {}   -- holds all area data
-local showmap_ver = "2.0"
+local mapTable = {}   -- holds all gaardian area data
+local mapTable2 = {}   -- holds all bootmap area data
+local showmap_ver = "2.1"
 local area_kw   -- current area
 local areaid   -- searched area
 local toggle_vi = false
+local MAP_LINKS = "https://aardwolfboot.com/maps-json/"
 
 -- Ensure DB file exists
 function file_exists(name)
@@ -89,7 +107,7 @@ function showmap_kw(name, line, wildcards)
   areaid = nil
 
   -- Check to see what the wildcard is first
-  if wildcards ~=nil then
+  if wildcards ~= nil then
     wildcards[1] = string.lower(wildcards[1])  -- force lowercase for match
     if wildcards[1] == "help" then
       ColourNote("springgreen","black","Showmap Reloaded v" .. showmap_ver .. " for Aardwolf by Memnoch")
@@ -105,7 +123,23 @@ function showmap_kw(name, line, wildcards)
       areaid = "ftii"
     elseif wildcards[1] == "list" then
       for i = 1, #mapTable do
-        Hyperlink(mapTable[i].map, mapTable[i].area, "Click link to be taken to your web browser.", "cyan", "black", 1)
+        ColourNote("springgreen", "black", mapTable[i].area)
+        if mapTable[i].map ~= "No map available" then
+          Hyperlink(mapTable[i].map, mapTable[i].map .. " - Gaardian Maps", "Click link to be taken to your web browser.", "cornflowerblue", "black", 1)
+        else
+          Tell("No Gaardian map available")
+        end
+        Note("")
+        for j = 1, #mapTable2 do
+          if mapTable[i].keyword == mapTable2[j].keyword then
+            for k, v in pairs (mapTable2[j]) do
+              if k ~= "keyword" then
+                Hyperlink(mapTable2[j][k], mapTable2[j][k] .. " - Boot Maps", "Clink link to be taken to your web browser.", "cornflowerblue","black", 1)
+                Note("")
+              end
+            end
+          end
+        end
         Note("")
       end  -- for
       Send("")
@@ -135,6 +169,7 @@ function showmap_kw(name, line, wildcards)
 
   -- Display the area details and map link if available
   if areafound then
+
     if toggle_vi == false then
       ColourTell("springgreen","black", "Showmap Reloaded v" .. showmap_ver .. " for Aardwolf by Memnoch")
       Note("")
@@ -160,6 +195,21 @@ function showmap_kw(name, line, wildcards)
         ColourTell("magenta","black","The Midgaardian Publishing Group")
         Note("")
         Hyperlink(mapTable[areafound].map, mapTable[areafound].map, "Click link to be taken to your web browser.", "cyan", "black", 1)
+        Note("")
+        Note("")
+        ColourTell("springgreen","black","Hosted by: ")
+        ColourTell("lime","black", "Boot Camp")
+        Note("")
+        for j = 1, #mapTable2 do
+          if mapTable[areafound].keyword == mapTable2[j].keyword then
+            for k, v in pairs (mapTable2[j]) do
+              if k ~= "keyword" then
+                Hyperlink(mapTable2[j][k], mapTable2[j][k] .. " - Boot Maps", "Clink link to be taken to your web browser.", "cyan","black", 1)
+                Note("")
+              end
+            end
+          end
+        end
         Send("")
       end  -- if
     else
@@ -250,6 +300,7 @@ function OnPluginInstall()
   -- Sets the file path to the default plugin folder for MUSH
   local dbFilePath = GetInfo(60) .. "showmapdb.db"
   local rowCount = 0
+  local rowCount2 = 0
 
   -- Request current zone data
   Send_GMCP_Packet("request area")
@@ -280,15 +331,131 @@ function OnPluginInstall()
 
     -- If the areas table isn't found in the DB it will throw an error
     if not table_exists then
-      ColourNote("red", "", "ERROR: Found database file but unable to locate table in database. Your database file may be corrupt. Please reinstall the plugin and database file.")
+      ColourNote("red", "", "ERROR: Found database file but unable to locate gaardian table in database. Your database file may be corrupt. Please reinstall the plugin and database file.")
       return
     else
       Note("[LOADED] Showmap Reloaded v" .. showmap_ver .. " by Memnoch (showmap help)")
-      Note("Successfully loaded data for " .. #mapTable .. " areas from the database.")
+      Note("Successfully loaded data for " .. #mapTable .. " areas from the Midgaardian database.")
     end  -- if
-
   end  -- if
+
+  if not db2 then
+    db2 = assert (sqlite3.open(dbFilePath))
+    local table2_exists = false
+
+    for row in db2:nrows("SELECT * FROM bootmaps ORDER BY keyword ASC") do
+
+      rowCount2 = rowCount2 + 1
+      if row["keyword"] ~= nil then
+        mapTable2[rowCount2] = row
+        for k, v in pairs(mapTable2[rowCount2]) do
+          if mapTable2[rowCount2][k] == "No map available" then
+            mapTable2[rowCount2][k] = nil
+          end
+        end
+      end
+      if mapTable2 ~= nil then
+        table2_exists = true
+      end
+    end
+
+    if not table2_exists then
+      ColourNote("red", "", "ERROR: Found database file but unable to locate bootmaps table in database. Your database file may be corrupt. Please reinstall the plugin and database file.")
+      return
+    else
+      Note("Successfully loaded data for " .. #mapTable2 .. " areas from the Boot Camp database.")
+    end  -- if
+  end  -- if
+
 end  -- function
+
+------ EXPERIMENTAL ------
+function html_decode(html)
+  html = string.gsub(html, '&lt;', '<')
+  html = string.gsub(html, '&gt;', '>')
+  html = string.gsub(html, '&amp;', '&')
+  html = string.gsub(html, '&#8221;', '"')
+  html = string.gsub(html, '&#8220;', '"')
+  html = string.gsub(html, '&#8243;', '"')
+  html = string.gsub(html, '&#8216;', '\'')
+  html = string.gsub(html, '&#8217;', '\'')
+  html = string.gsub(html, '&#8211;', '-')
+  html = string.gsub(html, '<br>', '')
+  html = string.gsub(html, ' target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\"', '')
+  html = string.gsub(html, ' </a>', '</a>')
+  return html
+end
+
+function update_maps_list()
+  async.doAsyncRemoteRequest(MAP_LINKS, update_maps_list_callback, "HTTPS")
+end
+
+function update_maps_list_callback(retval, page, status, headers, full_status, request_url)
+  if status ~= 200 then
+    ColourNote("red", "", "Could not download maps json")
+  else
+    ColourNote("springgreen", "", "Successfully downloaded maps json page. Updating map data")
+    local map_data = string.match(page, "<p>(.-)</p>")
+    map_data = html_decode(map_data)
+    local decoded = json.decode(map_data)
+    decoded = decoded.data
+    decoded = fixjson(decoded)
+--    tprint(decoded)
+    update_maps_from_live_data(decoded)
+  end
+end
+
+function update_maps_from_live_data(map_data)
+
+  db2:exec [[
+    DROP TABLE IF EXISTS bootmaps;
+    CREATE TABLE bootmaps (keyword, map1, map2, map3, map4, map5, map6);
+  ]]
+
+  for i = 1, #map_data do
+    if map_data[i][1] ~= "Area" then
+      sqlstr = "INSERT INTO bootmaps VALUES ('" .. map_data[i][2]
+      for j = 8, 13 do
+        if map_data[i][j] then
+          sqlstr = sqlstr .. "', '" .. map_data[i][j]
+        else
+          sqlstr = sqlstr .. "', 'No map available"
+        end
+      end
+      sqlstr = sqlstr .. "');"
+
+      db2:exec(sqlstr)
+
+    end  -- if
+  end  -- for
+
+  ColourNote("springgreen", "", "Updated map data.  Please reload the plugin.")
+
+end
+
+function fixjson(decode_data)
+
+  for i = 1, #decode_data do
+    decode_data[i][1] = Trim(decode_data[i][1])
+    decode_data[i][1] = string.gsub(decode_data[i][1], "<a href(.-)>", "")
+    decode_data[i][1] = string.gsub(decode_data[i][1], "</a>", "")
+    decode_data[i][1] = string.gsub(decode_data[i][1], "'", "''")
+    decode_data[i][2] = string.gsub(decode_data[i][2], ">(.-)<", "><")
+    decode_data[i][2] = string.gsub(decode_data[i][2], "</a>", "")
+    decode_data[i][4] = string.gsub(decode_data[i][4], "N/A", "immhomes")
+    line_split = 0
+    decode_data[i][2] = (utils.split(decode_data[i][2], "<"))
+    table.remove(decode_data[i][2],1)
+    for k, v in ipairs(decode_data[i][2]) do
+      v = string.gsub(v, "a href=\"", "")
+      v = string.gsub(v, "\">", "")
+      table.insert(decode_data[i], #decode_data[i] + 1, v)
+    end
+    table.remove(decode_data[i], 3)
+    table.remove(decode_data[i], 2)
+  end
+  return decode_data
+end
 
 ]]>
 </script> 
