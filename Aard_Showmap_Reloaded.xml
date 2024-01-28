@@ -266,6 +266,21 @@ function showmap_nokw()
       ColourTell("magenta","black","The Midgaardian Publishing Group")
       Note("")
       Hyperlink(mapTable[areafound].map, mapTable[areafound].map, "Click link to be taken to your web browser.", "cyan", "black", 1)
+      Note("")
+      Note("")
+      ColourTell("springgreen","black","Hosted by: ")
+      ColourTell("lime","black", "Boot Camp")
+      Note("")
+      for j = 1, #mapTable2 do
+        if mapTable[areafound].keyword == mapTable2[j].keyword then
+          for k, v in pairs (mapTable2[j]) do
+            if k ~= "keyword" then
+              Hyperlink(mapTable2[j][k], mapTable2[j][k] .. " - Boot Maps", "Clink link to be taken to your web browser.", "cyan","black", 1)
+              Note("")
+            end
+          end
+        end
+      end
       Send("")
     end  -- if
 
