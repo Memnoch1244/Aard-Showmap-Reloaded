@@ -12,6 +12,6 @@ Included commands:
 - showmap list       - Lists all available area maps.
 - showmap reload     - Reloads the plugin
 
-Credit to Pwar for the original idea.
+Credit to Pwar for the original Showmap plugin.
 
 Thanks to The Midgaardian Publishing Group and Boot Camp for hosting maps and providing VI support.
