@@ -25,6 +25,7 @@ showmap list       - lists of all areas with external map data (short name)
 showmap togglevi   - enables or disables visually impaired mode (opens automatically VI map if available for area)
 showmap version    - displays the version of the Showmap plugin (also visible in help)
 showmap help       - shows only this help
+showmap reload     - reloads the plugin
 	
 Special thanks to Myth for providing updated map data. 
 Special thanks to The Midgaardian Publishing Group and Boot Camp for archiving and hosting.
@@ -65,6 +66,18 @@ Credit to Pwar for the original Showmap.
   <alias
    match="^showmap update$"
    script="update_maps_list"
+   omit_from_output="n"
+   omit_from_log="n"
+   omit_from_command_history="n"
+   enabled="y"
+   sequence="99"
+   regexp="y"
+  >
+  </alias>
+
+  <alias
+   match="^showmap reload$"
+   script="reload"
    omit_from_output="n"
    omit_from_log="n"
    omit_from_command_history="n"
@@ -444,7 +457,8 @@ function update_maps_from_live_data(map_data)
     end  -- if
   end  -- for
 
-  ColourNote("springgreen", "", "Updated map data.  Please reload the plugin.")
+  ColourNote("springgreen", "", "Updated map data.  Reloading plugin.")
+  reload()
 
 end
 
@@ -470,6 +484,11 @@ function fixjson(decode_data)
     table.remove(decode_data[i], 2)
   end
   return decode_data
+end
+
+function reload()
+  ColourNote("springgreen", "", "Reloading Showmap")
+  Execute(GetAlphaOption("script_prefix") .. "DoAfterSpecial(1, \"ReloadPlugin('" .. GetPluginID() .. "')\", sendto.script)")
 end
 
 ]]>
